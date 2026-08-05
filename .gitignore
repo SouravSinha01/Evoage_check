@@ -1,0 +1,12 @@
+.run/
+logs/
+*.log
+*.pid
+nohup.out
+
+Backend/.env
+Frontend/.env
+Frontend/__pycache__/
+Backend/__pycache__/
+
+data/neo4j/
