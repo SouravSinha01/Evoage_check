@@ -265,8 +265,7 @@ check_backend_model_artifacts() {
 
   if [[ "$missing" == "1" ]]; then
     warn "Backend was not started because required DGL-EvoKG model/data artifacts are missing."
-    warn "Download or copy the DGL-EvoKG artifacts from:"
-    warn "$DGL_DATASET_URL"
+    warn "Download or copy the DGL-EvoKG artifacts from: $DGL_DATASET_URL"
     warn "Then set Backend/.env ROOT_DIR_PATH to the directory containing Model/, Node_Mapping/, and Dummy_Input/."
     warn "After fixing the paths, rerun: bash scripts/start_app.sh --restart"
     fail "Backend model/data preflight failed."
