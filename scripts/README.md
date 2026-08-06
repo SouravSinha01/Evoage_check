@@ -25,7 +25,7 @@ At the end of this first step, some checks may print concise warnings for missin
 bash scripts/download_neo4j_dump.sh
 ```
 
-The script downloads this Hugging Face file: (Evoage_HuggingFace_files)[https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main]
+The script downloads this Hugging Face file: [Evoage_HuggingFace_files](https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main)
 - Extracts the neo4j dump file
 
 ```text
