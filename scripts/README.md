@@ -108,21 +108,10 @@ data/neo4j/neo4j.dump
 
 It performs:
 
-- base system package install/check
-- Redis install/configuration
-- Redis password setup
-- Redis restart and `PING` check
-- Neo4j install
-- Neo4j version display
-- Neo4j stop before dump restore
-- initial Neo4j password setup
-- APOC plugin install
-- APOC config update
-- Neo4j dump restore
-- Neo4j data/plugin ownership repair after restore
-- Neo4j restart after APOC and restore
-- wait for Neo4j database query readiness
-- Neo4j login check
+- Installs and configures required system packages, Redis, and Neo4j.
+- Secures Redis and Neo4j with passwords and verifies connectivity.
+- Installs/configures APOC and restores the Neo4j database dump.
+- Repairs permissions, restarts services, and validates Neo4j readiness
 - graph node-count check
 
 If Neo4j starts but queries fail with `AccessDeniedException` under `/var/lib/neo4j/data`, repair ownership manually:
@@ -161,13 +150,9 @@ bash scripts/setup.sh --check-only
 ```
 
 This does not reinstall anything and does not start the app.
-
 It validates: all the required files, dependencies, packages.
 
 - If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The urls will work with the next command
-
-
-
 
 ## 7. Start backend and frontend
 
@@ -182,7 +167,6 @@ Runtime defaults:
 - frontend printed/checked URL comes from `Backend/.env` `FRONTEND_URL`
 - if both localhost and server-IP values exist, the server-IP URL is preferred for display/checks
 - if those values are missing/placeholders, the fallback URLs are `http://localhost:1026` and `http://localhost:8501`
-- the script always also prints localhost fallback URLs
 - if the server-IP URL fails but localhost works, the app is running and the remaining issue is network/firewall/IP exposure
 
 Before starting the backend, the script checks the DGL-EvoKG model/data files configured in `Backend/.env`:
@@ -203,14 +187,7 @@ https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
 
 Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`.
 
-For SSH/server access from another machine, bind the app servers to the network interface and print server-IP URLs:
-
 - Do not replace the Neo4j/Redis localhost values with `SERVER_IP_OR_DOMAIN` unless another machine needs to connect directly to those database services.
-
-Runtime files:
-
-- logs: `logs/backend.log`, `logs/frontend.log`
-- PIDs: `.run/backend.pid`, `.run/frontend.pid`
 
 ## Useful commands:
 
