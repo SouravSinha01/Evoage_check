@@ -119,4 +119,4 @@ if [[ "$DRY_RUN" != "1" ]]; then
 fi
 
 info "Neo4j dump ready: $EXTRACTED_DUMP_PATH"
-info "Next: fill Backend/.env service values, then run: bash scripts/setup_services.sh"
+info "Next: fill all required values in Backend/.env and Frontend/.env, then run: bash scripts/setup_services.sh"

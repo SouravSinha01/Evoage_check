@@ -37,7 +37,7 @@ only for system-level commands.
 
 Before running this script:
   1. Run: bash scripts/download_neo4j_dump.sh
-  2. Fill Backend/.env with NEO4J_PASSWORD and REDIS_PASSWORD.
+  2. Fill Backend/.env and Frontend/.env with all required values.
 
 Options:
   --dump PATH           Optional dump path. Default: data/neo4j/neo4j.dump.
@@ -50,6 +50,11 @@ Options:
 Required values:
   NEO4J_PASSWORD        Read from Backend/.env or shell environment.
   REDIS_PASSWORD        Read from Backend/.env or shell environment.
+
+Full application validation:
+  This script checks only the values needed for Redis and Neo4j setup.
+  Run "bash scripts/setup.sh --check-only" after service setup to validate
+  model paths, JWT/API values, imports, and app URLs.
 
 Optional Backend/.env or shell values:
   NEO4J_URI             Default: neo4j://localhost:7687
@@ -469,4 +474,4 @@ if [[ "$SETUP_NEO4J" == "1" ]]; then
 fi
 
 info "Service setup complete"
-info "Final check: bash scripts/setup.sh --check-only"
+info "Next: run full setup verification with: bash scripts/setup.sh --check-only"

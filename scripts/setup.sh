@@ -312,8 +312,8 @@ show_first_run_guidance() {
   warn "Some .env values are still placeholders. This is normal after the first app dependency setup."
   info "Next steps:"
   printf '  1. Download the Neo4j dump: bash scripts/download_neo4j_dump.sh\n'
-  printf '  2. Configure services: NEO4J_PASSWORD="..." REDIS_PASSWORD="..." bash scripts/setup_services.sh --dump data/neo4j/neo4j.dump\n'
-  printf '  3. Fill remaining Backend/.env values: model paths, JWT secret, and LLM/API settings.\n'
+  printf '  2. Fill all required values in Backend/.env and Frontend/.env.\n'
+  printf '  3. Configure services: bash scripts/setup_services.sh\n'
   printf '  4. Re-run strict verification: bash scripts/setup.sh --check-only\n'
   printf '  5. Start the app: bash scripts/start_app.sh\n'
 }

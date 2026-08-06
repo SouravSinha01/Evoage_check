@@ -12,12 +12,9 @@ Run every command from the repository root. Do not run these scripts with `sudo 
 bash scripts/setup.sh --all
 bash scripts/download_neo4j_dump.sh
 
-# Fill service values in Backend/.env and Frontend/.env.
+# Fill all required values in Backend/.env and Frontend/.env.
 
 bash scripts/setup_services.sh
-
-# Fill remaining Backend/.env values.
-
 bash scripts/setup.sh --check-only
 bash scripts/start_app.sh
 ```
@@ -58,9 +55,11 @@ data/neo4j/neo4j.dump
 
 The script uses resumable download flags for `curl` or `wget`. If a resumed download or extraction fails, remove the incomplete file under `data/neo4j/` and rerun the same command.
 
-### 3. Fill service values in `.env` files
+### 3. Fill all required `.env` values
 
-After the dump is ready, fill the service values in `Backend/.env`. For both local installs and SSH/server installs where Neo4j and Redis run on the same machine as the backend, keep database services private on `localhost`:
+After the dump is ready, fill `Backend/.env` and `Frontend/.env` once. `setup_services.sh` uses the service values, and `setup.sh --check-only` verifies the full application configuration before startup.
+
+For both local installs and SSH/server installs where Neo4j and Redis run on the same machine as the backend, keep database services private on `localhost`:
 
 ```env
 NEO4J_URI=neo4j://localhost:7687
@@ -112,13 +111,42 @@ FastAPI backend
 
 This exposes only the frontend/backend app ports. Neo4j and Redis stay internal unless you intentionally configure them otherwise.
 
+Also fill the remaining backend values before moving on:
+
+- DGL-EvoKG root/model/data paths
+- DGL/DGL-KE input and dummy-list paths
+- hypothesis-testing paths
+- JWT secret
+- LLM/API key settings
+- email settings if using email or reset-password features
+
+The start script checks these DGL-EvoKG artifacts before launching the backend:
+
+- `MODEL_PATH`
+- `MODEL_PATH/config.json`
+- `ENT_DICT_PATH`
+- `REL_DICT_PATH`
+- `NODE_MAPPINGS_PATH`
+- `DGLKE_DUMMY_HEAD_LIST`
+- `DGLKE_DUMMY_REL_LIST`
+
+Download or copy the required DGL-EvoKG artifacts from:
+
+```text
+https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
+```
+
+Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`.
+
 ### 4. Install/configure Redis and Neo4j, then restore the dump
 
 ```bash
 bash scripts/setup_services.sh
 ```
 
-This script reads service values from `Backend/.env`, syncs app URLs into both `.env` files, installs/configures Redis and Neo4j, installs APOC, restores the graph dump, repairs Neo4j permissions, restarts services, and verifies connectivity.
+This script reads service values from `Backend/.env`, syncs app URLs into both `.env` files, installs/configures Redis and Neo4j, installs APOC, restores the graph dump, repairs Neo4j permissions, restarts services, and verifies service connectivity.
+
+It intentionally checks only the values needed for Redis and Neo4j setup. The full `.env` validation happens in the next step.
 
 By default it uses:
 
@@ -158,36 +186,7 @@ cypher-shell -a bolt://localhost:7687 -u neo4j -p 'YOUR_NEO4J_PASSWORD' "SHOW DA
 
 If `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths and fixes them automatically during setup.
 
-### 5. Fill remaining backend values
-
-Before strict verification, fill the remaining required values in `Backend/.env`, especially:
-
-- DGL-EvoKG root/model/data paths
-- DGL/DGL-KE input and dummy-list paths
-- hypothesis-testing paths
-- JWT secret
-- LLM/API key settings
-- email settings if using email or reset-password features
-
-The start script checks these DGL-EvoKG artifacts before launching the backend:
-
-- `MODEL_PATH`
-- `MODEL_PATH/config.json`
-- `ENT_DICT_PATH`
-- `REL_DICT_PATH`
-- `NODE_MAPPINGS_PATH`
-- `DGLKE_DUMMY_HEAD_LIST`
-- `DGLKE_DUMMY_REL_LIST`
-
-Download or copy the required DGL-EvoKG artifacts from:
-
-```text
-https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
-```
-
-Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`.
-
-### 6. Run final setup checks
+### 5. Run final setup checks
 
 ```bash
 bash scripts/setup.sh --check-only
@@ -197,7 +196,7 @@ This does not reinstall dependencies and does not start the app. It validates re
 
 If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The next step starts those processes.
 
-### 7. Start backend and frontend
+### 6. Start backend and frontend
 
 ```bash
 bash scripts/start_app.sh
