@@ -43,7 +43,7 @@ The EvoAGE repository is organized into three primary functional components:
 | **pipeline**      | Includes all scripts, configurations, and utilities required for building the Knowledge Graph, training, validating, and optimizing KGE models, and experiments. Refer to the `README.md` inside this folder for detailed instructions. |
 
 
-## Script-based setup
+## ⚡︎˖ ࣪Script-based setup
 
 If you don't want to write many commands, head to -> [scripts setup guide](scripts/README.md), where the shell-based setup flow is written.
 
