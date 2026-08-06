@@ -1,43 +1,66 @@
-# EvoAge shell-based setup flow
+# EvoAge Shell Setup Flow
 
-This folder contains helper scripts for users who want to set up EvoAge with fewer manual commands while still keeping verification checks visible.
+![EvoAge setup command flow](./setup-flow.svg)
 
-Run all scripts from the repository root.
+This folder contains helper scripts for setting up EvoAge with fewer manual commands while keeping verification checks visible.
 
-Do not run these scripts with `sudo bash`. Run them as a normal user. The service setup script calls `sudo` only when it needs system-level access, and your terminal will ask for the sudo password at that point.
+Run every command from the repository root. Do not run these scripts with `sudo bash`; run them as a normal user. Scripts that need system-level access call `sudo` internally and your terminal will ask for the sudo password at that point.
 
-## 1. Prepare Python environments and `.env` files
+## Quick Command Sequence
+
+```bash
+bash scripts/setup.sh --all
+bash scripts/download_neo4j_dump.sh
+
+# Fill service values in Backend/.env and Frontend/.env.
+
+bash scripts/setup_services.sh
+
+# Fill remaining Backend/.env values.
+
+bash scripts/setup.sh --check-only
+bash scripts/start_app.sh
+```
+
+## What Each Step Does
+
+### 1. Prepare Python environments and `.env` files
 
 ```bash
 bash scripts/setup.sh --all
 ```
 
-This creates/checks the backend and frontend conda environments, installs  dependencies. 
+This creates or checks the backend and frontend conda environments, installs Python dependencies, and creates these files from the templates if they do not already exist:
 
 - `Backend/.env`
 - `Frontend/.env`
 
-At the end of this first step, some checks may print concise warnings for missing Neo4j, Redis, JWT, model-path, or API-key values. That is expected before the graph dump and services are configured.
+The first run can print warnings for missing Neo4j, Redis, JWT, model-path, or API-key values. That is expected before the dump, services, and model artifacts are configured.
 
-## 2. Download and extract the Neo4j dump
+### 2. Download and extract the Neo4j dump
 
 ```bash
 bash scripts/download_neo4j_dump.sh
 ```
 
-The script downloads this Hugging Face file: [Evoage_HuggingFace_files](https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main)
-- Extracts the neo4j dump file
+The script downloads the Neo4j dump tarball from the EvoAge Hugging Face dataset:
 
 ```text
-kg_formation/neo4j/neo4j.dump.tar.gz
+https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
 ```
-Note : if interupted mid download, the file needs to be removed & redownloaded with the same script
 
-## 3. Fill service values in `Backend/.env`
+Default output:
 
-After the dump is ready, fill the Neo4j and Redis values in `Backend/.env`.
+```text
+data/neo4j/neo4j.dump.tar.gz
+data/neo4j/neo4j.dump
+```
 
-For both local and SSH/server installs, the recommended default is to keep Neo4j and Redis private to the same machine:
+The script uses resumable download flags for `curl` or `wget`. If a resumed download or extraction fails, remove the incomplete file under `data/neo4j/` and rerun the same command.
+
+### 3. Fill service values in `.env` files
+
+After the dump is ready, fill the service values in `Backend/.env`. For both local installs and SSH/server installs where Neo4j and Redis run on the same machine as the backend, keep database services private on `localhost`:
 
 ```env
 NEO4J_URI=neo4j://localhost:7687
@@ -50,10 +73,7 @@ REDIS_USERNAME=default
 REDIS_PASSWORD=YOUR_REDIS_PASSWORD
 ```
 
-Use the server IP/domain only for the backend and frontend app URLs.
-
-For an SSH/server setup, replace `SERVER_IP_OR_DOMAIN` with the server IP or domain that users will open in their browser:
-For an local setup, Everything works fine keeping localhost.
+Use the server IP or domain only for the backend/frontend app URLs that users open from a browser:
 
 ```env
 API_BASE=http://SERVER_IP_OR_DOMAIN:1026
@@ -74,7 +94,7 @@ FRONTEND_URL=http://localhost:8501
 API_BASE_URL=http://localhost:1026
 ```
 
-Recommended SSH/server connectivity model:
+Recommended SSH/server connectivity:
 
 ```text
 User browser
@@ -92,27 +112,33 @@ FastAPI backend
 
 This exposes only the frontend/backend app ports. Neo4j and Redis stay internal unless you intentionally configure them otherwise.
 
-## 4. Install/configure Redis and Neo4j, then restore the dump
+### 4. Install/configure Redis and Neo4j, then restore the dump
 
 ```bash
 bash scripts/setup_services.sh
 ```
 
-This script reads Neo4j/Redis values from `Backend/.env`.
+This script reads service values from `Backend/.env`, syncs app URLs into both `.env` files, installs/configures Redis and Neo4j, installs APOC, restores the graph dump, repairs Neo4j permissions, restarts services, and verifies connectivity.
 
-It uses the extracted dump automatically:
+By default it uses:
 
 ```text
 data/neo4j/neo4j.dump
 ```
 
-It performs:
+Use a custom dump path when needed:
 
-- Installs and configures required system packages, Redis, and Neo4j.
-- Secures Redis and Neo4j with passwords and verifies connectivity.
-- Installs/configures APOC and restores the Neo4j database dump.
-- Repairs permissions, restarts services, and validates Neo4j readiness
-- graph node-count check
+```bash
+bash scripts/setup_services.sh --dump /path/to/neo4j.dump
+```
+
+Useful variants:
+
+```bash
+bash scripts/setup_services.sh --skip-neo4j
+bash scripts/setup_services.sh --skip-redis
+bash scripts/setup_services.sh --dry-run
+```
 
 If Neo4j starts but queries fail with `AccessDeniedException` under `/var/lib/neo4j/data`, repair ownership manually:
 
@@ -130,46 +156,20 @@ Then test:
 cypher-shell -a bolt://localhost:7687 -u neo4j -p 'YOUR_NEO4J_PASSWORD' "SHOW DATABASES;"
 ```
 
-If your `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths automatically and fixes the permission issues as well.
+If `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths and fixes them automatically during setup.
 
-## 5. Fill remaining backend values
+### 5. Fill remaining backend values
 
 Before strict verification, fill the remaining required values in `Backend/.env`, especially:
 
-- model/data paths
-- DGL/DGL-KE paths
+- DGL-EvoKG root/model/data paths
+- DGL/DGL-KE input and dummy-list paths
 - hypothesis-testing paths
 - JWT secret
 - LLM/API key settings
-- email settings if using email/reset-password features
+- email settings if using email or reset-password features
 
-## 6. Run final setup checks
-
-```bash
-bash scripts/setup.sh --check-only
-```
-
-This does not reinstall anything and does not start the app.
-It validates: all the required files, dependencies, packages.
-
-- If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The urls will work with the next command
-
-## 7. Start backend and frontend
-
-```bash
-bash scripts/start_app.sh
-```
-
-This starts the backend and frontend in the background, writes logs/PID files, prints URLs, and checks whether the URLs become reachable.
-
-Runtime defaults:
-- backend printed/checked URL comes from `Frontend/.env` `API_BASE_URL`, then `Backend/.env` `API_BASE`
-- frontend printed/checked URL comes from `Backend/.env` `FRONTEND_URL`
-- if both localhost and server-IP values exist, the server-IP URL is preferred for display/checks
-- if those values are missing/placeholders, the fallback URLs are `http://localhost:1026` and `http://localhost:8501`
-- if the server-IP URL fails but localhost works, the app is running and the remaining issue is network/firewall/IP exposure
-
-Before starting the backend, the script checks the DGL-EvoKG model/data files configured in `Backend/.env`:
+The start script checks these DGL-EvoKG artifacts before launching the backend:
 
 - `MODEL_PATH`
 - `MODEL_PATH/config.json`
@@ -179,7 +179,7 @@ Before starting the backend, the script checks the DGL-EvoKG model/data files co
 - `DGLKE_DUMMY_HEAD_LIST`
 - `DGLKE_DUMMY_REL_LIST`
 
-If these files are missing, the backend will not start. Download or copy the required DGL-EvoKG artifacts from:
+Download or copy the required DGL-EvoKG artifacts from:
 
 ```text
 https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
@@ -187,25 +187,38 @@ https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
 
 Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`.
 
-- Do not replace the Neo4j/Redis localhost values with `SERVER_IP_OR_DOMAIN` unless another machine needs to connect directly to those database services.
+### 6. Run final setup checks
 
-## Useful commands:
+```bash
+bash scripts/setup.sh --check-only
+```
+
+This does not reinstall dependencies and does not start the app. It validates required `.env` values, service connectivity, conda environments, imports, and configured URLs.
+
+If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The next step starts those processes.
+
+### 7. Start backend and frontend
+
+```bash
+bash scripts/start_app.sh
+```
+
+This starts the backend and frontend in the background, writes logs/PID files, prints URLs, and checks whether the URLs become reachable.
+
+Runtime defaults:
+
+- Backend printed/checked URL comes from `Frontend/.env` `API_BASE_URL`, then `Backend/.env` `API_BASE`.
+- Frontend printed/checked URL comes from `Backend/.env` `FRONTEND_URL`.
+- If both localhost and server-IP values exist, the server-IP URL is preferred for display/checks.
+- If values are missing/placeholders, fallbacks are `http://localhost:1026` and `http://localhost:8501`.
+- If the server-IP URL fails but localhost works, the app is running and the remaining issue is network, firewall, DNS, or port exposure.
+
+Useful commands:
 
 ```bash
 bash scripts/start_app.sh --restart
 bash scripts/start_app.sh --stop
+bash scripts/start_app.sh --backend-only
+bash scripts/start_app.sh --frontend-only
 bash scripts/setup.sh --check-only
-```
-
-## Full command sequence
-
-```bash
-bash scripts/setup.sh --all
-bash scripts/download_neo4j_dump.sh
-
-# Fill Backend/.env and Frontend/.env
-
-bash scripts/setup_services.sh
-bash scripts/setup.sh --check-only
-bash scripts/start_app.sh
 ```
