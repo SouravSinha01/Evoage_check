@@ -13,6 +13,11 @@ bash scripts/setup.sh --all
 bash scripts/download_neo4j_dump.sh
 
 # Fill all required values in Backend/.env and Frontend/.env.
+# Choose either USE=gemini or USE=medgemma in Backend/.env.
+
+# Optional local MedGemma path only:
+# bash scripts/setup.sh --medgemma
+# bash scripts/setup_medgemma.sh
 
 bash scripts/setup_services.sh
 bash scripts/setup.sh --check-only
@@ -117,8 +122,48 @@ Also fill the remaining backend values before moving on:
 - DGL/DGL-KE input and dummy-list paths
 - hypothesis-testing paths
 - JWT secret
-- LLM/API key settings
 - email settings if using email or reset-password features
+
+Choose one LLM provider:
+
+```env
+USE=gemini
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+GEMINI_MODEL=gemini-2.5-flash-lite
+```
+
+Or, for local control with MedGemma:
+
+```env
+USE=medgemma
+MEDGEMMA_BASE_URL=http://localhost:30001/v1
+MEDGEMMA_MODEL=medgemma-27b-local
+```
+
+If you use Gemini, skip the MedGemma setup and continue directly to service setup.
+
+If you use MedGemma, first create the separate SGLang environment:
+
+```bash
+bash scripts/setup.sh --medgemma
+```
+
+Then download the MedGemma model:
+
+```bash
+conda run -n sglang hf download google/medgemma-27b-text-it \
+  --local-dir ./scripts/medgemma-27b-local \
+  --token YOUR_HF_READ_TOKEN \
+  --max-workers 4
+```
+
+Start the local MedGemma server:
+
+```bash
+bash scripts/setup_medgemma.sh
+```
+
+Note: run `bash scripts/setup_medgemma.sh` in another terminal. The model server can take time to load and must stay running while the backend uses `USE=medgemma`.
 
 The start script checks these DGL-EvoKG artifacts before launching the backend:
 

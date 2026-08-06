@@ -62,7 +62,7 @@
   <path d="M1260 414 L1260 488" class="connector"/>
   <polygon points="1260,488 1247,468 1273,468" class="arrow-head"/>
 
- 
+
 
   <!-- Step 4 -> Step 5 -->
   <line x1="1036" y1="653" x2="980" y2="653" class="connector"/>

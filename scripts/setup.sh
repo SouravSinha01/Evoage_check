@@ -7,10 +7,12 @@ FRONTEND_DIR="$ROOT_DIR/Frontend"
 
 BACKEND_ENV_NAME="${BACKEND_ENV_NAME:-evoage_backend}"
 FRONTEND_ENV_NAME="${FRONTEND_ENV_NAME:-evoage_frontend}"
+MEDGEMMA_ENV_NAME="${MEDGEMMA_ENV_NAME:-sglang}"
 NEO4J_APOC_VERSION="${NEO4J_APOC_VERSION:-5.26.14}"
 
 INSTALL_BACKEND=0
 INSTALL_FRONTEND=0
+INSTALL_MEDGEMMA=0
 INSTALL_SYSTEM=0
 INSTALL_NEO4J=0
 INSTALL_REDIS=0
@@ -29,7 +31,15 @@ BACKEND_REQUIRED_KEYS=(
   NODE_MAPPINGS_PATH MODEL_PATH ENT_DICT_PATH REL_DICT_PATH
   DGLKE_INPUT_DIR DGLKE_DUMMY_HEAD_LIST DGLKE_DUMMY_REL_LIST
   API_BASE CUTOFF_FILE_NAME HYPOTHESIS_ENT_DICT_PATH
-  HYPOTHESIS_TRIPLE_OUTPUT_DIR EDGE_TENSOR_PATH GEMINI_API_KEY
+  HYPOTHESIS_TRIPLE_OUTPUT_DIR EDGE_TENSOR_PATH USE
+)
+
+GEMINI_REQUIRED_KEYS=(
+  GEMINI_API_KEY GEMINI_MODEL
+)
+
+MEDGEMMA_REQUIRED_KEYS=(
+  MEDGEMMA_BASE_URL MEDGEMMA_MODEL
 )
 
 FRONTEND_REQUIRED_KEYS=(
@@ -44,6 +54,7 @@ Automates EvoAge setup while keeping verification checks visible.
 
 Common flows:
   scripts/setup.sh --all
+  scripts/setup.sh --medgemma
   scripts/setup.sh --backend --frontend
   scripts/setup.sh --system --redis --neo4j --neo4j-dump /path/to/neo4j.dump
   scripts/setup.sh --check-only
@@ -52,6 +63,7 @@ Options:
   --all                 Install backend and frontend Python dependencies.
   --backend             Set up Backend conda env, deps, DGL-KE, and env template.
   --frontend            Set up Frontend conda env, deps, and env template.
+  --medgemma            Set up separate MedGemma/SGLang conda env. Optional.
   --system              Install apt-level prerequisites: Java, wget, curl, gpg.
   --neo4j               Install Neo4j 5 and APOC. Requires sudo on Debian/Ubuntu.
   --redis               Install Redis server. Requires sudo on Debian/Ubuntu.
@@ -65,6 +77,7 @@ Options:
 Environment variables:
   BACKEND_ENV_NAME      Backend conda env name. Default: evoage_backend
   FRONTEND_ENV_NAME     Frontend conda env name. Default: evoage_frontend
+  MEDGEMMA_ENV_NAME     MedGemma/SGLang conda env name. Default: sglang
   NEO4J_PASSWORD        Initial Neo4j password and check password.
   REDIS_PASSWORD        Redis password to configure/check.
 EOF
@@ -175,6 +188,7 @@ parse_args() {
         ;;
       --backend) INSTALL_BACKEND=1 ;;
       --frontend) INSTALL_FRONTEND=1 ;;
+      --medgemma) INSTALL_MEDGEMMA=1 ;;
       --system) INSTALL_SYSTEM=1 ;;
       --neo4j)
         INSTALL_SYSTEM=1
@@ -195,6 +209,7 @@ parse_args() {
         CHECK_ONLY=1
         INSTALL_BACKEND=0
         INSTALL_FRONTEND=0
+        INSTALL_MEDGEMMA=0
         INSTALL_SYSTEM=0
         INSTALL_NEO4J=0
         INSTALL_REDIS=0
@@ -237,6 +252,7 @@ env_value() {
     BEGIN { FS = "=" }
     $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
       sub(/^[^=]*=/, "")
+      sub(/[[:space:]]+#.*/, "")
       print
     }
   ' "$file" 2>/dev/null | tail -n 1 | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//" || true
@@ -304,6 +320,32 @@ env_file_ready() {
   return 0
 }
 
+configured_llm_provider() {
+  local provider
+  provider="$(env_value "$BACKEND_DIR/.env" USE)"
+  provider="${provider:-gemini}"
+  printf '%s\n' "$provider" | tr '[:upper:]' '[:lower:]'
+}
+
+set_backend_required_keys_for_env() {
+  local provider
+  provider="$(configured_llm_provider)"
+  BACKEND_REQUIRED_KEYS_FOR_ENV=("${BACKEND_REQUIRED_KEYS[@]}")
+
+  case "$provider" in
+    gemini)
+      BACKEND_REQUIRED_KEYS_FOR_ENV+=("${GEMINI_REQUIRED_KEYS[@]}")
+      ;;
+    medgemma)
+      BACKEND_REQUIRED_KEYS_FOR_ENV+=("${MEDGEMMA_REQUIRED_KEYS[@]}")
+      ;;
+    *)
+      warn "Unknown USE value in Backend/.env: $provider. Expected gemini or medgemma."
+      BACKEND_REQUIRED_KEYS_FOR_ENV+=("${GEMINI_REQUIRED_KEYS[@]}")
+      ;;
+  esac
+}
+
 show_first_run_guidance() {
   if [[ "$CHECK_ONLY" == "1" || "$ENV_MISSING" != "1" ]]; then
     return
@@ -313,9 +355,11 @@ show_first_run_guidance() {
   info "Next steps:"
   printf '  1. Download the Neo4j dump: bash scripts/download_neo4j_dump.sh\n'
   printf '  2. Fill all required values in Backend/.env and Frontend/.env.\n'
-  printf '  3. Configure services: bash scripts/setup_services.sh\n'
-  printf '  4. Re-run strict verification: bash scripts/setup.sh --check-only\n'
-  printf '  5. Start the app: bash scripts/start_app.sh\n'
+  printf '     Use USE=gemini with GEMINI_API_KEY, or USE=medgemma with MEDGEMMA_BASE_URL/MEDGEMMA_MODEL.\n'
+  printf '  3. Optional local MedGemma: bash scripts/setup.sh --medgemma, then bash scripts/setup_medgemma.sh in another terminal.\n'
+  printf '  4. Configure services: bash scripts/setup_services.sh\n'
+  printf '  5. Re-run strict verification: bash scripts/setup.sh --check-only\n'
+  printf '  6. Start the app: bash scripts/start_app.sh\n'
 }
 
 quiet_check() {
@@ -352,7 +396,8 @@ validate_env_files() {
   ENV_MISSING=0
 
   info "Checking required .env values"
-  validate_env_file "$BACKEND_DIR/.env" "$strict" "${BACKEND_REQUIRED_KEYS[@]}"
+  set_backend_required_keys_for_env
+  validate_env_file "$BACKEND_DIR/.env" "$strict" "${BACKEND_REQUIRED_KEYS_FOR_ENV[@]}"
   validate_env_file "$FRONTEND_DIR/.env" "$strict" "${FRONTEND_REQUIRED_KEYS[@]}"
 
   if [[ "$strict" == "1" && "$ENV_MISSING" == "1" ]]; then
@@ -512,6 +557,22 @@ setup_frontend() {
     conda_run "$FRONTEND_ENV_NAME" python -m pip install --progress-bar on -r "$FRONTEND_DIR/requirements.txt"
 }
 
+setup_medgemma() {
+  info "Setting up MedGemma/SGLang environment"
+  info "This creates a separate conda environment for the local LLM server. It is not used when Backend/.env has USE=gemini."
+
+  run_step "MedGemma [1/3] Creating/checking conda env: $MEDGEMMA_ENV_NAME" "1-5 minutes if env is new" \
+    setup_conda_env "$MEDGEMMA_ENV_NAME" "3.11"
+  run_step "MedGemma [2/3] Upgrading pip" "1-3 minutes" \
+    conda_run "$MEDGEMMA_ENV_NAME" python -m pip install --progress-bar on --upgrade pip
+  run_step "MedGemma [3/3] Installing SGLang and Hugging Face CLI" "10-45+ minutes on first run" \
+    conda_run "$MEDGEMMA_ENV_NAME" python -m pip install --progress-bar on "sglang[all]==0.5.15.post1" huggingface_hub
+
+  info "MedGemma environment is ready."
+  info "Download the model with: conda run -n $MEDGEMMA_ENV_NAME hf download google/medgemma-27b-text-it --local-dir ./scripts/medgemma-27b-local --token YOUR_HF_READ_TOKEN --max-workers 4"
+  info "Then start the local server in another terminal: bash scripts/setup_medgemma.sh"
+}
+
 check_python_env() {
   local env_name="$1"
   local label="$2"
@@ -545,8 +606,12 @@ run_checks() {
   local app_urls_not_running=0
   local backend_env_ready=0
   local frontend_env_ready=0
+  local llm_provider
+  local medgemma_base_url
 
-  if env_file_ready "$BACKEND_DIR/.env" "${BACKEND_REQUIRED_KEYS[@]}"; then
+  set_backend_required_keys_for_env
+  llm_provider="$(configured_llm_provider)"
+  if env_file_ready "$BACKEND_DIR/.env" "${BACKEND_REQUIRED_KEYS_FOR_ENV[@]}"; then
     backend_env_ready=1
   fi
   if env_file_ready "$FRONTEND_DIR/.env" "${FRONTEND_REQUIRED_KEYS[@]}"; then
@@ -583,6 +648,7 @@ run_checks() {
 
   info "Backend URL configured for frontend: $backend_url"
   info "Frontend URL configured for backend emails: $frontend_url"
+  info "LLM provider configured for hypothesis pipeline: $llm_provider"
 
   have python3 && python3 --version || warn "python3 not found on PATH."
   have java && java -version || warn "Java not found on PATH."
@@ -618,6 +684,23 @@ run_checks() {
       else
         info "Neo4j login and graph node-count check succeeded."
       fi
+    fi
+  fi
+
+  if [[ "$llm_provider" == "medgemma" ]]; then
+    medgemma_base_url="$(env_value "$BACKEND_DIR/.env" MEDGEMMA_BASE_URL)"
+    if looks_unfilled "$medgemma_base_url"; then
+      warn "Skipping MedGemma check: MEDGEMMA_BASE_URL is not configured yet."
+    elif have curl; then
+      info "Checking MedGemma/SGLang server reachability"
+      if curl -fsS "${medgemma_base_url%/}/models" >/dev/null 2>&1; then
+        info "MedGemma/SGLang server is reachable: $medgemma_base_url"
+      else
+        warn "MedGemma/SGLang server is not reachable yet: $medgemma_base_url"
+        warn "If USE=medgemma, run bash scripts/setup_medgemma.sh in another terminal before starting the app."
+      fi
+    else
+      warn "curl not found; skipping MedGemma/SGLang reachability check."
     fi
   fi
 
@@ -697,6 +780,9 @@ main() {
   fi
   if [[ "$INSTALL_FRONTEND" == "1" ]]; then
     setup_frontend
+  fi
+  if [[ "$INSTALL_MEDGEMMA" == "1" ]]; then
+    setup_medgemma
   fi
   if [[ "$RUN_CHECKS" == "1" ]]; then
     run_checks

@@ -123,7 +123,7 @@ class HypothesisConfig(BaseSettings):
 #         env_prefix = ""   # read env vars exactly as named in .env
         
 class GoogleGeminiConfig(BaseSettings):
-    GEMINI_API_KEY: str
+    GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-1.5-flash"
 
     # LLM backend switch for the hypothesis pipeline: "gemini" (default) or
