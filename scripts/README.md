@@ -12,17 +12,10 @@ Do not run these scripts with `sudo bash`. Run them as a normal user. The servic
 bash scripts/setup.sh --all
 ```
 
-This creates/checks the backend and frontend conda environments, installs Python dependencies, installs local DGL-KE for the backend, installs Poetry dependencies, and creates these files when missing:
+This creates/checks the backend and frontend conda environments, installs  dependencies. 
 
 - `Backend/.env`
 - `Frontend/.env`
-
-Expected time on a fresh machine:
-
-- backend dependencies: about 20-75+ minutes, mainly because PyTorch/CUDA, DGL, PyKEEN, and scientific Python wheels are large
-- frontend dependencies: about 5-25 minutes
-
-The script prints numbered backend/frontend stages, start times, per-stage duration, and pip package download progress.
 
 At the end of this first step, some checks may print concise warnings for missing Neo4j, Redis, JWT, model-path, or API-key values. That is expected before the graph dump and services are configured.
 
@@ -32,28 +25,13 @@ At the end of this first step, some checks may print concise warnings for missin
 bash scripts/download_neo4j_dump.sh
 ```
 
-The script downloads this Hugging Face file:
+The script downloads this Hugging Face file: (Evoage_HuggingFace_files)[https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main]
+- Extracts the neo4j dump file
 
 ```text
 kg_formation/neo4j/neo4j.dump.tar.gz
 ```
-
-Dataset page:
-
-```text
-https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
-```
-
-The script saves the tarball and extracted dump here:
-
-```text
-data/neo4j/neo4j.dump.tar.gz
-data/neo4j/neo4j.dump
-```
-
-If `neo4j.dump.tar.gz` already exists, the script skips the download. If `neo4j.dump` is missing, it extracts the dump from the tarball automatically.
-
-The dump is large, so it is reasonable to run this command in a separate terminal from the EvoAge repo root.
+Note : if interupted mid download, the file needs to be removed & redownloaded with the same script
 
 ## 3. Fill service values in `Backend/.env`
 
@@ -75,6 +53,7 @@ REDIS_PASSWORD=YOUR_REDIS_PASSWORD
 Use the server IP/domain only for the backend and frontend app URLs.
 
 For an SSH/server setup, replace `SERVER_IP_OR_DOMAIN` with the server IP or domain that users will open in their browser:
+For an local setup, Everything works fine keeping localhost.
 
 ```env
 API_BASE=http://SERVER_IP_OR_DOMAIN:1026
@@ -162,7 +141,7 @@ Then test:
 cypher-shell -a bolt://localhost:7687 -u neo4j -p 'YOUR_NEO4J_PASSWORD' "SHOW DATABASES;"
 ```
 
-If your `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths automatically.
+If your `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths automatically and fixes the permission issues as well.
 
 ## 5. Fill remaining backend values
 
@@ -183,30 +162,12 @@ bash scripts/setup.sh --check-only
 
 This does not reinstall anything and does not start the app.
 
-It validates:
+It validates: all the required files, dependencies, packages.
 
-- required `.env` values
-- backend conda environment
-- frontend conda environment
-- Python
-- Java
-- Redis CLI
-- Neo4j
-- `cypher-shell`
-- Redis login
-- Neo4j login
-- graph node count
-- backend config/imports
-- frontend config/imports
-- backend/frontend URL reachability if those apps are already running
+- If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The urls will work with the next command
 
-If backend/frontend URLs are not reachable during `--check-only`, that is expected before the app is started. The script will show the next command:
 
-```bash
-bash scripts/start_app.sh
-```
 
-For SSH/server setups, use the server-exposed start command shown by the check output.
 
 ## 7. Start backend and frontend
 
@@ -217,9 +178,6 @@ bash scripts/start_app.sh
 This starts the backend and frontend in the background, writes logs/PID files, prints URLs, and checks whether the URLs become reachable.
 
 Runtime defaults:
-
-- backend binds to `0.0.0.0`
-- frontend binds to `0.0.0.0`
 - backend printed/checked URL comes from `Frontend/.env` `API_BASE_URL`, then `Backend/.env` `API_BASE`
 - frontend printed/checked URL comes from `Backend/.env` `FRONTEND_URL`
 - if both localhost and server-IP values exist, the server-IP URL is preferred for display/checks
@@ -247,22 +205,14 @@ Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`,
 
 For SSH/server access from another machine, bind the app servers to the network interface and print server-IP URLs:
 
-```bash
-BACKEND_HOST=0.0.0.0 \
-FRONTEND_HOST=0.0.0.0 \
-BACKEND_PUBLIC_URL=http://SERVER_IP_OR_DOMAIN:1026 \
-FRONTEND_PUBLIC_URL=http://SERVER_IP_OR_DOMAIN:8501 \
-bash scripts/start_app.sh
-```
-
-Do not replace the Neo4j/Redis localhost values with `SERVER_IP_OR_DOMAIN` unless another machine needs to connect directly to those database services.
+- Do not replace the Neo4j/Redis localhost values with `SERVER_IP_OR_DOMAIN` unless another machine needs to connect directly to those database services.
 
 Runtime files:
 
 - logs: `logs/backend.log`, `logs/frontend.log`
 - PIDs: `.run/backend.pid`, `.run/frontend.pid`
 
-Useful commands:
+## Useful commands:
 
 ```bash
 bash scripts/start_app.sh --restart
