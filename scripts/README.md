@@ -71,10 +71,11 @@ bash scripts/download_evoage_artifacts.sh --skip-neo4j
 
 ### 3. Fill all required `.env` values
 
-After the dump and DGL-EvoKG artifacts are ready, fill `Backend/.env` and `Frontend/.env` once. `setup_services.sh` uses the service values, and `setup.sh --check-only` verifies the full application configuration before startup.
+After the dump and DGL-EvoKG artifacts are ready, fill `Backend/.env` and `Frontend/.env` once. `setup_services.sh` uses the service values and also does checks.
 
 For both local installs and SSH/server installs where Neo4j and Redis run on the same machine as the backend, keep database services private on `localhost`:
 
+**Database Services**
 ```env
 NEO4J_URI=neo4j://localhost:7687
 NEO4J_USERNAME=neo4j
@@ -99,7 +100,7 @@ In `Frontend/.env`, set:
 API_BASE_URL=http://SERVER_IP_OR_DOMAIN:1026
 ```
 
-For local-only testing, use `localhost` for the app URLs too:
+For **local-only testing**, use `localhost` for the app URLs too:
 
 ```env
 API_BASE=http://localhost:1026
@@ -107,23 +108,6 @@ FRONTEND_URL=http://localhost:8501
 API_BASE_URL=http://localhost:1026
 ```
 
-Recommended SSH/server connectivity:
-
-```text
-User browser
-  -> http://SERVER_IP_OR_DOMAIN:8501
-  -> Streamlit frontend on the server
-  -> http://SERVER_IP_OR_DOMAIN:1026
-  -> FastAPI backend on the server
-  -> neo4j://localhost:7687
-  -> Neo4j on the same server
-
-FastAPI backend
-  -> localhost:6379
-  -> Redis on the same server
-```
-
-This exposes only the frontend/backend app ports. Neo4j and Redis stay internal unless you intentionally configure them otherwise.
 
 Also fill the remaining backend values before moving on:
 
@@ -131,9 +115,9 @@ Also fill the remaining backend values before moving on:
 - DGL/DGL-KE input and dummy-list paths
 - hypothesis-testing paths
 - JWT secret
-- email settings if using email or reset-password features
+- Email settings if using email or reset-password features
 
-Choose one LLM provider:
+### Choose one LLM provider:
 
 ```env
 USE=gemini
@@ -151,22 +135,22 @@ MEDGEMMA_MODEL=medgemma-27b-local
 
 If you use Gemini, skip the MedGemma setup and continue directly to service setup.
 
-If you use MedGemma, run the MedGemma setup script in another terminal:
+If you use MedGemma, run the MedGemma setup script in another terminal from the same repository root and :
+
+> **Warning:** MedGemma 27B needs roughly 60GB VRAM; an 80GB GPU is recommended. If you do not have enough GPU memory, use `USE=gemini` with the Gemini API instead.
+>
+> Keep the MedGemma/SGLang server process running while the backend uses `USE=medgemma`. Continue the remaining setup/startup commands from a separate terminal in the same repo.
+
+`google/medgemma-27b-text-it` is a gated repository. Accept the licence on the model page with your Hugging Face account, then use a read token and run the below command:
 
 ```bash
 MEDGEMMA_HF_TOKEN=YOUR_HF_READ_TOKEN bash scripts/setup_medgemma.sh
 ```
 
-This script creates/checks the `sglang` conda environment, installs SGLang and the Hugging Face CLI, downloads `google/medgemma-27b-text-it` into `Backend/medgemma-27b-local`, and starts the local SGLang server. The model server can take time to load and must stay running while the backend uses `USE=medgemma`.
+This script creates/checks the `sglang` conda environment, installs SGLang and the Hugging Face CLI, downloads `google/medgemma-27b-text-it` into `Backend/medgemma-27b-local`, and starts the local SGLang server. The model server can take time to load.
 
-Useful variants:
 
-```bash
-MEDGEMMA_HF_TOKEN=YOUR_HF_READ_TOKEN bash scripts/setup_medgemma.sh --download-only
-bash scripts/setup_medgemma.sh --skip-download
-```
-
-The start script checks these DGL-EvoKG artifacts before launching the backend:
+The `start_app.sh` script checks these DGL-EvoKG artifacts before launching the backend:
 
 - `MODEL_PATH`
 - `MODEL_PATH/config.json`
@@ -213,24 +197,6 @@ bash scripts/setup_services.sh --skip-neo4j
 bash scripts/setup_services.sh --skip-redis
 bash scripts/setup_services.sh --dry-run
 ```
-
-If Neo4j starts but queries fail with `AccessDeniedException` under `/var/lib/neo4j/data`, repair ownership manually:
-
-```bash
-sudo systemctl stop neo4j
-sudo chown -R neo4j:neo4j /var/lib/neo4j/data
-sudo chown -R neo4j:neo4j /var/lib/neo4j/plugins
-sudo chmod -R u+rwX,g+rX /var/lib/neo4j/data
-sudo systemctl start neo4j
-```
-
-Then test:
-
-```bash
-cypher-shell -a bolt://localhost:7687 -u neo4j -p 'YOUR_NEO4J_PASSWORD' "SHOW DATABASES;"
-```
-
-If `/etc/neo4j/neo4j.conf` uses a custom `server.directories.data` or `server.directories.plugins`, run the same ownership commands on those configured paths instead. The script detects those configured paths and fixes them automatically during setup.
 
 ### 5. Run final setup checks
 

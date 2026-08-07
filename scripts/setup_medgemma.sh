@@ -40,6 +40,14 @@ Usage: scripts/setup_medgemma.sh [options]
 Sets up the local MedGemma SGLang environment, downloads the gated model into
 Backend/medgemma-27b-local, and starts the local SGLang server.
 
+WARNING:
+  MedGemma 27B needs roughly 60GB VRAM; an 80GB GPU is recommended.
+  If this machine does not have enough GPU memory, use USE=gemini with the
+  Gemini API instead of USE=medgemma.
+  Run this script from the repo root in a separate terminal, and continue the
+  rest of setup/startup from another terminal in the same repo. Keep the
+  MedGemma/SGLang server process running while the backend uses USE=medgemma.
+
 Run this only when Backend/.env uses:
   USE=medgemma
   MEDGEMMA_BASE_URL=http://localhost:30001/v1
@@ -95,6 +103,14 @@ conda_run() {
   local env_name="$1"
   shift
   conda run -n "$env_name" "$@"
+}
+
+show_medgemma_warnings() {
+  warn "!!! MEDGEMMA RESOURCE WARNING !!!"
+  warn "MedGemma 27B needs roughly 60GB VRAM; an 80GB GPU is recommended."
+  warn "If this host does not have enough GPU memory, set Backend/.env USE=gemini and use the Gemini API instead."
+  warn "Run this script from the repo root in a separate terminal, then continue the rest of setup/startup from another terminal in the same repo."
+  warn "Keep the MedGemma/SGLang server process running while the backend uses USE=medgemma."
 }
 
 setup_sglang_env() {
@@ -184,6 +200,7 @@ start_server() {
   info "Watch logs with: tail -f $LOG_FILE"
 }
 
+show_medgemma_warnings
 setup_sglang_env
 if [[ "$DOWNLOAD_MODEL" == "1" ]]; then
   download_model
