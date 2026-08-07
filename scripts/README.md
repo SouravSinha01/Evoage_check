@@ -141,7 +141,7 @@ If you use MedGemma, run the MedGemma setup script in another terminal from the 
 >
 > Keep the MedGemma/SGLang server process running while the backend uses `USE=medgemma`. Continue the remaining setup/startup commands from a separate terminal in the same repo.
 
-`google/medgemma-27b-text-it` is a gated repository. Accept the licence on the model page with your Hugging Face account, then use a read token and run the below command:
+`google/medgemma-27b-text-it` is a gated repository. Accept the licence on the model page with your Hugging Face account, then use a `read token` and run the command with the token:
 
 ```bash
 MEDGEMMA_HF_TOKEN=YOUR_HF_READ_TOKEN bash scripts/setup_medgemma.sh
