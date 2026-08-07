@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
   <title>EvoAge Setup Flow</title>
-  <desc>Six-step setup flow with clear serpentine direction: steps 1 to 3 move left to right, step 3 moves down to step 4, and steps 4 to 6 move right to left.</desc>
+  <desc>Six-step setup flow with an optional MedGemma branch after environment configuration: steps 1 to 3 move left to right, optional step 3a is checked before service setup, and steps 4 to 6 move right to left.</desc>
 
   <defs>
     <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
@@ -20,18 +20,23 @@
 
       .card { fill: #ffffff; stroke: #c8d7dd; stroke-width: 2; }
       .card-env { fill: #fff9ed; stroke: #e6a12a; stroke-width: 2.5; }
+      .card-optional { fill: #f7f1ff; stroke: #8f63c7; stroke-width: 2.5; }
       .card-start { fill: #f3fbf6; stroke: #72a98a; stroke-width: 2.5; }
 
       .step-circle { fill: #2f6070; }
       .step-circle-env { fill: #d58a17; }
+      .step-circle-optional { fill: #7a4fb0; }
       .step-circle-start { fill: #3f7e5d; }
       .step-number { font: 700 18px Arial, sans-serif; fill: #ffffff; text-anchor: middle; dominant-baseline: middle; }
+      .step-number-small { font: 700 14px Arial, sans-serif; fill: #ffffff; text-anchor: middle; dominant-baseline: middle; }
 
       .card-title { font: 700 20px Arial, sans-serif; fill: #122e38; }
       .command-box { fill: #f1f6f8; }
       .command { font: 700 15px "DejaVu Sans Mono", monospace; fill: #183944; }
       .body { font: 400 14px Arial, sans-serif; fill: #526b75; }
       .body-strong { font: 700 14px Arial, sans-serif; fill: #36535d; }
+      .body-small { font: 400 12px Arial, sans-serif; fill: #526b75; }
+      .body-small-strong { font: 700 12px Arial, sans-serif; fill: #36535d; }
 
       .connector { fill: none; stroke: #2f6070; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
       .arrow-head { fill: #2f6070; }
@@ -58,9 +63,13 @@
   <line x1="980" y1="299" x2="1036" y2="299" class="connector"/>
   <polygon points="1036,299 1016,286 1016,312" class="arrow-head"/>
 
-  <!-- Step 3 -> Step 4 -->
-  <path d="M1260 414 L1260 488" class="connector"/>
-  <polygon points="1260,488 1247,468 1273,468" class="arrow-head"/>
+  <!-- Step 3 -> optional MedGemma check -->
+  <path d="M1260 414 L1260 438" class="connector"/>
+  <polygon points="1260,438 1247,418 1273,418" class="arrow-head"/>
+
+  <!-- Optional MedGemma check -> Step 4 -->
+  <path d="M1260 516 L1260 538" class="connector"/>
+  <polygon points="1260,538 1247,518 1273,518" class="arrow-head"/>
 
 
 
@@ -98,8 +107,9 @@
   <text x="614" y="283" class="command">bash scripts/</text>
   <text x="614" y="307" class="command">download_evoage_artifacts.sh</text>
 
-  <text x="598" y="359" class="body">Creates:</text>
-  <text x="655" y="359" class="body-strong">data/neo4j/neo4j.dump</text>
+  <text x="598" y="356" class="body">Creates Neo4j dump and places DGL-EvoKG</text>
+  <text x="598" y="378" class="body">artifacts under:</text>
+  <text x="714" y="378" class="body-strong">Backend/DGL-EvoKG/</text>
 
   <!-- ================= CARD 3 ================= -->
   <g filter="url(#shadow)">
@@ -114,7 +124,24 @@
   <text x="1110" y="307" class="command">Frontend/.env</text>
   <text x="1110" y="331" class="command">Services, paths, JWT, API keys</text>
 
-  <text x="1094" y="381" class="body">Complete these values before provisioning.</text>
+  <text x="1094" y="375" class="body">Choose:</text>
+  <text x="1153" y="375" class="body-strong">USE=gemini</text>
+  <text x="1261" y="375" class="body">or</text>
+  <text x="1284" y="375" class="body-strong">USE=medgemma</text>
+  <text x="1094" y="397" class="body">Complete these values before provisioning.</text>
+
+
+  <!-- ================= OPTIONAL CARD 3A ================= -->
+  <g filter="url(#shadow)">
+    <rect x="1068" y="438" width="408" height="78" rx="18" class="card-optional"/>
+  </g>
+  <circle cx="1108" cy="477" r="24" class="step-circle-optional"/>
+  <text x="1108" y="477" class="step-number-small">3a</text>
+  <text x="1146" y="467" class="card-title">MedGemma check</text>
+  <text x="1146" y="491" class="body-small">Only if</text>
+  <text x="1192" y="491" class="body-small-strong">USE=medgemma</text>
+  <text x="1287" y="491" class="body-small">: accept HF access and use token.</text>
+  <text x="1146" y="508" class="body-small">Check ~60GB VRAM; run setup_medgemma.sh separately.</text>
 
   <!-- ================= CARD 4 ================= -->
   <g filter="url(#shadow)">
