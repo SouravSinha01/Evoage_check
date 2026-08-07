@@ -224,7 +224,7 @@ The current backend PyTorch/DGL-KE GPU runtime may not run on Blackwell GPUs if 
 
 This is a Blackwell-specific PyTorch CUDA compatibility issue, not a general EvoAge setup failure. Non-Blackwell supported CUDA GPUs should continue to use the normal setup flow.
 
-Runtime defaults:
+## Runtime defaults:
 
 - Backend printed/checked URL comes from `Frontend/.env` `API_BASE_URL`, then `Backend/.env` `API_BASE`.
 - Frontend printed/checked URL comes from `Backend/.env` `FRONTEND_URL`.
