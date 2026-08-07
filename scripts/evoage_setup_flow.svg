@@ -96,7 +96,7 @@
 
   <rect x="598" y="258" width="356" height="68" rx="10" class="command-box"/>
   <text x="614" y="283" class="command">bash scripts/</text>
-  <text x="614" y="307" class="command">download_neo4j_dump.sh</text>
+  <text x="614" y="307" class="command">download_evoage_artifacts.sh</text>
 
   <text x="598" y="359" class="body">Creates:</text>
   <text x="655" y="359" class="body-strong">data/neo4j/neo4j.dump</text>

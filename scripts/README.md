@@ -10,13 +10,12 @@ Run every command from the repository root. Do not run these scripts with `sudo 
 
 ```bash
 bash scripts/setup.sh --all
-bash scripts/download_neo4j_dump.sh
+bash scripts/download_evoage_artifacts.sh
 
 # Fill all required values in Backend/.env and Frontend/.env.
 # Choose either USE=gemini or USE=medgemma in Backend/.env.
 
 # Optional local MedGemma path only:
-# bash scripts/setup.sh --medgemma
 # bash scripts/setup_medgemma.sh
 
 bash scripts/setup_services.sh
@@ -39,16 +38,17 @@ This creates or checks the backend and frontend conda environments, installs Pyt
 
 The first run can print warnings for missing Neo4j, Redis, JWT, model-path, or API-key values. That is expected before the dump, services, and model artifacts are configured.
 
-### 2. Download and extract the Neo4j dump
+### 2. Download EvoAge data artifacts
 
 ```bash
-bash scripts/download_neo4j_dump.sh
+bash scripts/download_evoage_artifacts.sh
 ```
 
-The script downloads the Neo4j dump tarball from the EvoAge Hugging Face dataset:
+The script downloads the Neo4j dump tarball and the DGL-EvoKG model artifacts from the EvoAge Hugging Face dataset:
 
 ```text
 https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
+https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main/DGL-EvoKG
 ```
 
 Default output:
@@ -56,13 +56,22 @@ Default output:
 ```text
 data/neo4j/neo4j.dump.tar.gz
 data/neo4j/neo4j.dump
+Backend/DGL-EvoKG/Model/
+Backend/DGL-EvoKG/Node_Mapping/
 ```
 
-The script uses resumable download flags for `curl` or `wget`. If a resumed download or extraction fails, remove the incomplete file under `data/neo4j/` and rerun the same command.
+The Neo4j dump still uses resumable download flags for `curl` or `wget`. DGL-EvoKG artifacts are downloaded with the Hugging Face CLI through the backend conda environment and are placed directly into the root README layout, so no file moving is needed.
+
+Useful variants:
+
+```bash
+bash scripts/download_evoage_artifacts.sh --skip-dgl
+bash scripts/download_evoage_artifacts.sh --skip-neo4j
+```
 
 ### 3. Fill all required `.env` values
 
-After the dump is ready, fill `Backend/.env` and `Frontend/.env` once. `setup_services.sh` uses the service values, and `setup.sh --check-only` verifies the full application configuration before startup.
+After the dump and DGL-EvoKG artifacts are ready, fill `Backend/.env` and `Frontend/.env` once. `setup_services.sh` uses the service values, and `setup.sh --check-only` verifies the full application configuration before startup.
 
 For both local installs and SSH/server installs where Neo4j and Redis run on the same machine as the backend, keep database services private on `localhost`:
 
@@ -142,28 +151,20 @@ MEDGEMMA_MODEL=medgemma-27b-local
 
 If you use Gemini, skip the MedGemma setup and continue directly to service setup.
 
-If you use MedGemma, first create the separate SGLang environment:
+If you use MedGemma, run the MedGemma setup script in another terminal:
 
 ```bash
-bash scripts/setup.sh --medgemma
+MEDGEMMA_HF_TOKEN=YOUR_HF_READ_TOKEN bash scripts/setup_medgemma.sh
 ```
 
-Then download the MedGemma model:
+This script creates/checks the `sglang` conda environment, installs SGLang and the Hugging Face CLI, downloads `google/medgemma-27b-text-it` into `Backend/medgemma-27b-local`, and starts the local SGLang server. The model server can take time to load and must stay running while the backend uses `USE=medgemma`.
+
+Useful variants:
 
 ```bash
-conda run -n sglang hf download google/medgemma-27b-text-it \
-  --local-dir ./scripts/medgemma-27b-local \
-  --token YOUR_HF_READ_TOKEN \
-  --max-workers 4
+MEDGEMMA_HF_TOKEN=YOUR_HF_READ_TOKEN bash scripts/setup_medgemma.sh --download-only
+bash scripts/setup_medgemma.sh --skip-download
 ```
-
-Start the local MedGemma server:
-
-```bash
-bash scripts/setup_medgemma.sh
-```
-
-Note: run `bash scripts/setup_medgemma.sh` in another terminal. The model server can take time to load and must stay running while the backend uses `USE=medgemma`.
 
 The start script checks these DGL-EvoKG artifacts before launching the backend:
 
@@ -175,13 +176,13 @@ The start script checks these DGL-EvoKG artifacts before launching the backend:
 - `DGLKE_DUMMY_HEAD_LIST`
 - `DGLKE_DUMMY_REL_LIST`
 
-Download or copy the required DGL-EvoKG artifacts from:
+The artifact downloader places the DGL-EvoKG files directly under `Backend/DGL-EvoKG/`:
 
 ```text
-https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main
+https://huggingface.co/datasets/gauravahuja77/EvoAge/tree/main/DGL-EvoKG
 ```
 
-Then set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`.
+Set `ROOT_DIR_PATH` in `Backend/.env` to the directory containing `Model/`, `Node_Mapping/`, and `Dummy_Input/`, for example `Backend/DGL-EvoKG` or its absolute path.
 
 ### 4. Install/configure Redis and Neo4j, then restore the dump
 

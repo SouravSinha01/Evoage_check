@@ -36,12 +36,12 @@ Do not prefer "sudo bash scripts/setup_services.sh"; this script calls sudo
 only for system-level commands.
 
 Before running this script:
-  1. Run: bash scripts/download_neo4j_dump.sh
+  1. Run: bash scripts/download_evoage_artifacts.sh
   2. Fill Backend/.env and Frontend/.env with all required values.
 
 Options:
   --dump PATH           Optional dump path. Default: data/neo4j/neo4j.dump.
-                        Use the extracted neo4j.dump produced by download_neo4j_dump.sh.
+                        Use the extracted neo4j.dump produced by download_evoage_artifacts.sh.
   --skip-neo4j          Do not install/configure/restore Neo4j.
   --skip-redis          Do not install/configure Redis.
   --dry-run             Print commands without changing system services.
@@ -246,7 +246,7 @@ hydrate_config_from_env_files() {
 
 resolve_dump_path() {
   [[ -n "$DUMP_PATH" ]] || fail "Dump path is required unless --skip-neo4j is used."
-  [[ "$DRY_RUN" == "1" || -f "$DUMP_PATH" ]] || fail "Neo4j dump not found: $DUMP_PATH. Run: bash scripts/download_neo4j_dump.sh"
+  [[ "$DRY_RUN" == "1" || -f "$DUMP_PATH" ]] || fail "Neo4j dump not found: $DUMP_PATH. Run: bash scripts/download_evoage_artifacts.sh"
 
   case "$DUMP_PATH" in
     *.tar.gz|*.tgz)

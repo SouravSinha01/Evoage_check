@@ -7,17 +7,16 @@ FRONTEND_DIR="$ROOT_DIR/Frontend"
 
 BACKEND_ENV_NAME="${BACKEND_ENV_NAME:-evoage_backend}"
 FRONTEND_ENV_NAME="${FRONTEND_ENV_NAME:-evoage_frontend}"
-MEDGEMMA_ENV_NAME="${MEDGEMMA_ENV_NAME:-sglang}"
 NEO4J_APOC_VERSION="${NEO4J_APOC_VERSION:-5.26.14}"
 
 INSTALL_BACKEND=0
 INSTALL_FRONTEND=0
-INSTALL_MEDGEMMA=0
 INSTALL_SYSTEM=0
 INSTALL_NEO4J=0
 INSTALL_REDIS=0
 RESTORE_NEO4J=0
 RUN_CHECKS=1
+RUN_PREFLIGHT=0
 DRY_RUN=0
 START_SERVICES=0
 NEO4J_DUMP_PATH=""
@@ -26,12 +25,12 @@ ENV_MISSING=0
 
 BACKEND_REQUIRED_KEYS=(
   NEO4J_URI NEO4J_USERNAME NEO4J_PASSWORD
-  REDIS_HOST REDIS_PORT REDIS_PASSWORD
-  JWT_SECRET_KEY
-  NODE_MAPPINGS_PATH MODEL_PATH ENT_DICT_PATH REL_DICT_PATH
+  REDIS_HOST REDIS_PORT REDIS_USERNAME REDIS_PASSWORD
+  FRONTEND_URL JWT_SECRET_KEY
+  ROOT_DIR_PATH NODE_MAPPINGS_PATH MODEL_PATH ENT_DICT_PATH REL_DICT_PATH
   DGLKE_INPUT_DIR DGLKE_DUMMY_HEAD_LIST DGLKE_DUMMY_REL_LIST
-  API_BASE CUTOFF_FILE_NAME HYPOTHESIS_ENT_DICT_PATH
-  HYPOTHESIS_TRIPLE_OUTPUT_DIR EDGE_TENSOR_PATH USE
+  INPUT_DIR_HYPOTHESIS API_BASE CUTOFF_FILE_NAME GLOBAL_SCORE_PERCENTILES_FILE
+  HYPOTHESIS_ENT_DICT_PATH HYPOTHESIS_TRIPLE_OUTPUT_DIR EDGE_TENSOR_PATH USE
 )
 
 GEMINI_REQUIRED_KEYS=(
@@ -39,7 +38,7 @@ GEMINI_REQUIRED_KEYS=(
 )
 
 MEDGEMMA_REQUIRED_KEYS=(
-  MEDGEMMA_BASE_URL MEDGEMMA_MODEL
+  GEMINI_API_KEY MEDGEMMA_BASE_URL MEDGEMMA_MODEL
 )
 
 FRONTEND_REQUIRED_KEYS=(
@@ -54,7 +53,7 @@ Automates EvoAge setup while keeping verification checks visible.
 
 Common flows:
   scripts/setup.sh --all
-  scripts/setup.sh --medgemma
+  scripts/setup_medgemma.sh
   scripts/setup.sh --backend --frontend
   scripts/setup.sh --system --redis --neo4j --neo4j-dump /path/to/neo4j.dump
   scripts/setup.sh --check-only
@@ -63,7 +62,6 @@ Options:
   --all                 Install backend and frontend Python dependencies.
   --backend             Set up Backend conda env, deps, DGL-KE, and env template.
   --frontend            Set up Frontend conda env, deps, and env template.
-  --medgemma            Set up separate MedGemma/SGLang conda env. Optional.
   --system              Install apt-level prerequisites: Java, wget, curl, gpg.
   --neo4j               Install Neo4j 5 and APOC. Requires sudo on Debian/Ubuntu.
   --redis               Install Redis server. Requires sudo on Debian/Ubuntu.
@@ -77,7 +75,6 @@ Options:
 Environment variables:
   BACKEND_ENV_NAME      Backend conda env name. Default: evoage_backend
   FRONTEND_ENV_NAME     Frontend conda env name. Default: evoage_frontend
-  MEDGEMMA_ENV_NAME     MedGemma/SGLang conda env name. Default: sglang
   NEO4J_PASSWORD        Initial Neo4j password and check password.
   REDIS_PASSWORD        Redis password to configure/check.
 EOF
@@ -185,10 +182,10 @@ parse_args() {
       --all)
         INSTALL_BACKEND=1
         INSTALL_FRONTEND=1
+        RUN_PREFLIGHT=1
         ;;
       --backend) INSTALL_BACKEND=1 ;;
       --frontend) INSTALL_FRONTEND=1 ;;
-      --medgemma) INSTALL_MEDGEMMA=1 ;;
       --system) INSTALL_SYSTEM=1 ;;
       --neo4j)
         INSTALL_SYSTEM=1
@@ -209,7 +206,6 @@ parse_args() {
         CHECK_ONLY=1
         INSTALL_BACKEND=0
         INSTALL_FRONTEND=0
-        INSTALL_MEDGEMMA=0
         INSTALL_SYSTEM=0
         INSTALL_NEO4J=0
         INSTALL_REDIS=0
@@ -353,10 +349,10 @@ show_first_run_guidance() {
 
   warn "Some .env values are still placeholders. This is normal after the first app dependency setup."
   info "Next steps:"
-  printf '  1. Download the Neo4j dump: bash scripts/download_neo4j_dump.sh\n'
+  printf '  1. Download EvoAge artifacts: bash scripts/download_evoage_artifacts.sh\n'
   printf '  2. Fill all required values in Backend/.env and Frontend/.env.\n'
   printf '     Use USE=gemini with GEMINI_API_KEY, or USE=medgemma with MEDGEMMA_BASE_URL/MEDGEMMA_MODEL.\n'
-  printf '  3. Optional local MedGemma: bash scripts/setup.sh --medgemma, then bash scripts/setup_medgemma.sh in another terminal.\n'
+  printf '  3. Optional local MedGemma: bash scripts/setup_medgemma.sh in another terminal.\n'
   printf '  4. Configure services: bash scripts/setup_services.sh\n'
   printf '  5. Re-run strict verification: bash scripts/setup.sh --check-only\n'
   printf '  6. Start the app: bash scripts/start_app.sh\n'
@@ -514,6 +510,38 @@ conda_run() {
   run conda run -n "$env_name" "$@"
 }
 
+preflight_all_warnings() {
+  info "Running lightweight setup preflight"
+
+  if have conda; then
+    info "conda found: $(conda --version)"
+  else
+    warn "conda was not found on PATH. setup.sh --all needs conda to create EvoAge environments."
+  fi
+
+  if have nvidia-smi; then
+    info "NVIDIA GPU detected"
+    nvidia-smi --query-gpu=name,memory.total --format=csv,noheader || warn "nvidia-smi exists, but GPU details could not be read."
+  else
+    warn "nvidia-smi was not found. EvoAge backend inference expects an NVIDIA GPU/CUDA-visible host."
+  fi
+
+  local available_kb
+  available_kb="$(df -Pk "$ROOT_DIR" | awk 'NR==2 {print $4}')"
+  if [[ "$available_kb" =~ ^[0-9]+$ ]]; then
+    local required_kb=$((100 * 1024 * 1024))
+    local available_gb=$((available_kb / 1024 / 1024))
+    info "Available disk space at repo path: ${available_gb}GB"
+    if [[ "$available_kb" -lt "$required_kb" ]]; then
+      warn "Keep at least 100GB free for EvoAge downloads/artifacts. Current free space is about ${available_gb}GB."
+    else
+      warn "Keep at least 100GB free for EvoAge downloads/artifacts before running the artifact downloader."
+    fi
+  else
+    warn "Could not determine available disk space. Keep at least 100GB free for EvoAge downloads/artifacts."
+  fi
+}
+
 setup_backend() {
   info "Setting up backend"
   info "Backend setup can take 20-75+ minutes on a fresh machine. The largest step is pip installing PyTorch/CUDA, DGL, PyKEEN, and scientific Python packages."
@@ -555,22 +583,6 @@ setup_frontend() {
     conda_run "$FRONTEND_ENV_NAME" python -m pip install --progress-bar on --upgrade pip
   run_step "Frontend [4/4] Installing frontend Python requirements" "5-20 minutes on first run" \
     conda_run "$FRONTEND_ENV_NAME" python -m pip install --progress-bar on -r "$FRONTEND_DIR/requirements.txt"
-}
-
-setup_medgemma() {
-  info "Setting up MedGemma/SGLang environment"
-  info "This creates a separate conda environment for the local LLM server. It is not used when Backend/.env has USE=gemini."
-
-  run_step "MedGemma [1/3] Creating/checking conda env: $MEDGEMMA_ENV_NAME" "1-5 minutes if env is new" \
-    setup_conda_env "$MEDGEMMA_ENV_NAME" "3.11"
-  run_step "MedGemma [2/3] Upgrading pip" "1-3 minutes" \
-    conda_run "$MEDGEMMA_ENV_NAME" python -m pip install --progress-bar on --upgrade pip
-  run_step "MedGemma [3/3] Installing SGLang and Hugging Face CLI" "10-45+ minutes on first run" \
-    conda_run "$MEDGEMMA_ENV_NAME" python -m pip install --progress-bar on "sglang[all]==0.5.15.post1" huggingface_hub
-
-  info "MedGemma environment is ready."
-  info "Download the model with: conda run -n $MEDGEMMA_ENV_NAME hf download google/medgemma-27b-text-it --local-dir ./scripts/medgemma-27b-local --token YOUR_HF_READ_TOKEN --max-workers 4"
-  info "Then start the local server in another terminal: bash scripts/setup_medgemma.sh"
 }
 
 check_python_env() {
@@ -650,16 +662,23 @@ run_checks() {
   info "Frontend URL configured for backend emails: $frontend_url"
   info "LLM provider configured for hypothesis pipeline: $llm_provider"
 
+  local run_service_checks=0
+  if [[ "$CHECK_ONLY" == "1" || "$INSTALL_SYSTEM" == "1" || "$INSTALL_NEO4J" == "1" || "$INSTALL_REDIS" == "1" || "$START_SERVICES" == "1" ]]; then
+    run_service_checks=1
+  fi
+
   have python3 && python3 --version || warn "python3 not found on PATH."
-  have java && java -version || warn "Java not found on PATH."
-  have redis-cli && redis-cli --version || warn "redis-cli not found on PATH."
-  have neo4j && neo4j --version || warn "neo4j not found on PATH."
-  have cypher-shell && cypher-shell --version || warn "cypher-shell not found on PATH."
+  if [[ "$run_service_checks" == "1" ]]; then
+    have java && java -version || warn "Java not found on PATH."
+    have redis-cli && redis-cli --version || warn "redis-cli not found on PATH."
+    have neo4j && neo4j --version || warn "neo4j not found on PATH."
+    have cypher-shell && cypher-shell --version || warn "cypher-shell not found on PATH."
+  fi
 
   check_python_env "$BACKEND_ENV_NAME" "backend"
   check_python_env "$FRONTEND_ENV_NAME" "frontend"
 
-  if have redis-cli; then
+  if [[ "$run_service_checks" == "1" ]] && have redis-cli; then
     if looks_unfilled "$redis_password_for_check"; then
       warn "Skipping Redis ping: REDIS_PASSWORD is not configured yet. setup_services.sh will configure Redis and sync Backend/.env."
     else
@@ -672,7 +691,7 @@ run_checks() {
     fi
   fi
 
-  if have cypher-shell; then
+  if [[ "$run_service_checks" == "1" ]] && have cypher-shell; then
     if looks_unfilled "$neo4j_password_for_check"; then
       warn "Skipping Neo4j login: NEO4J_PASSWORD is not configured yet. setup_services.sh will set it and restore the dump."
     else
@@ -772,6 +791,9 @@ main() {
   require_dir "$BACKEND_DIR"
   require_dir "$FRONTEND_DIR"
 
+  if [[ "$RUN_PREFLIGHT" == "1" ]]; then
+    preflight_all_warnings
+  fi
   if [[ "$INSTALL_SYSTEM" == "1" ]]; then
     install_system_packages
   fi
@@ -780,9 +802,6 @@ main() {
   fi
   if [[ "$INSTALL_FRONTEND" == "1" ]]; then
     setup_frontend
-  fi
-  if [[ "$INSTALL_MEDGEMMA" == "1" ]]; then
-    setup_medgemma
   fi
   if [[ "$RUN_CHECKS" == "1" ]]; then
     run_checks
