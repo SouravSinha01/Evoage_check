@@ -92,7 +92,7 @@
   </g>
   <circle cx="612" cy="226" r="24" class="step-circle"/>
   <text x="612" y="226" class="step-number">2</text>
-  <text x="650" y="233" class="card-title">Download graph dump & artifacts</text>
+  <text x="650" y="233" class="card-title">Download graph dump and artifacts</text>
 
   <rect x="598" y="258" width="356" height="68" rx="10" class="command-box"/>
   <text x="614" y="283" class="command">bash scripts/</text>
