@@ -146,7 +146,7 @@ download_model() {
     warn "Existing MedGemma directory is incomplete or invalid; re-running Hugging Face download: $MEDGEMMA_MODEL_PATH"
   fi
 
-  info "Downloading MedGemma model"
+  info "Downloading MedGemma model..If model download gets aborted, check the README for instructions to resume the download."
   info "Model repo: $MEDGEMMA_MODEL_REPO"
   info "Target path: $MEDGEMMA_MODEL_PATH"
 
